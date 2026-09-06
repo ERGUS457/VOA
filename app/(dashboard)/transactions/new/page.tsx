@@ -96,14 +96,14 @@ export default function CreateTransactionPage() {
                   list="voa-list"
                   autoComplete="off"
                   placeholder="Ketik atau pilih Nomor VOA..."
-                  className="w-full pl-12 pr-12 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy focus:border-transparent font-bold text-slate-800 tracking-wide"
+                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy focus:border-transparent font-bold text-slate-800 tracking-wide"
                 />
                 <datalist id="voa-list">
                   {availableVoas.map(voa => (
                     <option key={voa} value={voa}>Tersedia</option>
                   ))}
                 </datalist>
-                {checking && <Loader2 className="w-5 h-5 animate-spin absolute right-4 top-3.5 text-slate-400" />}
+                {checking && <Loader2 className="w-5 h-5 animate-spin absolute right-10 top-3.5 text-navy" />}
               </div>
               {voaStatus && (
                 <div className={`mt-3 p-3 rounded-lg text-xs font-bold flex items-center gap-2 ${voaStatus.status === 'AVAILABLE' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
