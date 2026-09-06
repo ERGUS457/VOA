@@ -77,22 +77,26 @@ export default function WebcamCapture({ onCapture }: { onCapture: (base64: strin
         </div>
       )}
       {stream && !capturedImg && (
-        <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden shadow-inner">
-          <video ref={setVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-          <button type="button" onClick={capturePhoto} className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white text-navy-dark px-6 py-2.5 rounded-full font-bold shadow-xl hover:scale-105 active:scale-95 transition-transform">
-            AMBIL FOTO
+        <div className="flex flex-col items-center gap-4 w-full">
+          <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden shadow-inner border border-slate-200">
+            <video ref={setVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+          </div>
+          <button type="button" onClick={capturePhoto} className="w-full bg-navy hover:bg-navy-dark text-white px-6 py-3 rounded-xl font-bold shadow-md transition-colors flex items-center justify-center gap-2">
+            <Camera className="w-5 h-5" /> AMBIL FOTO SEKARANG
           </button>
         </div>
       )}
       {capturedImg && (
-        <div className="relative w-full aspect-square md:aspect-video bg-slate-900 rounded-lg overflow-hidden flex justify-center items-center shadow-inner">
-          <img src={capturedImg} alt="Preview" className="max-h-full object-contain" />
-          <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4">
-            <button type="button" onClick={resetPhoto} className="bg-slate-800 text-white px-4 py-2 rounded-full text-sm font-bold flex items-center gap-1 shadow-lg hover:bg-slate-700">
+        <div className="flex flex-col items-center gap-4 w-full">
+          <div className="relative w-full aspect-video bg-slate-900 rounded-lg overflow-hidden flex justify-center items-center shadow-inner border border-slate-200">
+            <img src={capturedImg} alt="Preview" className="max-h-full object-contain" />
+          </div>
+          <div className="flex justify-center gap-3 w-full">
+            <button type="button" onClick={resetPhoto} className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-colors">
               <RotateCcw className="w-4 h-4" /> ULANGI
             </button>
-            <button type="button" onClick={usePhoto} className="bg-emerald-600 text-white px-4 py-2 rounded-full text-sm font-bold flex items-center gap-1 shadow-lg hover:bg-emerald-700">
-              <Check className="w-4 h-4" /> GUNAKAN FOTO
+            <button type="button" onClick={usePhoto} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-md transition-colors">
+              <Check className="w-5 h-5" /> GUNAKAN FOTO
             </button>
           </div>
         </div>
