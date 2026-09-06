@@ -331,11 +331,6 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
       }
     };
   }, []);
-      clearTimeout(scanTimerRef.current);
-      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-      if (workerRef.current) workerRef.current.terminate();
-    };
-  }, []);
 
   return (
     <>
