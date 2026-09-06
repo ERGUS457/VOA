@@ -5,6 +5,7 @@ import DataTable from '@/app/components/DataTable';
 import { verifySession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { Shield, User } from 'lucide-react';
+import { AddUserModal, UserActions } from './UserForms';
 
 export const metadata = { title: 'Manajemen Petugas | PLBN Aruk' };
 
@@ -21,6 +22,7 @@ export default async function UsersPage() {
           <h1 className="text-2xl font-bold text-slate-800">Manajemen Petugas</h1>
           <p className="text-slate-500 text-sm mt-1">Kelola akun admin dan petugas loket.</p>
         </div>
+        <AddUserModal />
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-4">
@@ -32,6 +34,7 @@ export default async function UsersPage() {
               <th className="px-4 py-3">Role</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Tgl Dibuat</th>
+              <th className="px-4 py-3 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -55,6 +58,9 @@ export default async function UsersPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-sm">{new Date(user.createdAt).toLocaleDateString('id-ID')}</td>
+                <td className="px-4 py-3">
+                  <UserActions user={user} />
+                </td>
               </tr>
             ))}
           </tbody>

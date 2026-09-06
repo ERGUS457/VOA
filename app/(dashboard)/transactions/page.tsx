@@ -5,6 +5,7 @@ import DataTable from '@/app/components/DataTable';
 import Link from 'next/link';
 import { Eye, Printer, Camera } from 'lucide-react';
 import { verifySession } from '@/lib/auth';
+import { TransactionActions } from './TransactionForms';
 
 export const metadata = { title: 'Data Transaksi | PLBN Aruk' };
 
@@ -82,7 +83,8 @@ export default async function TransactionsPage() {
                   </td>
                   <td className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">{row.officerName}</td>
                   <td className="px-4 py-3 flex justify-end gap-2">
-                    <Link href={`/receipt/${tx.id}`} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Cetak Struk">
+                    <TransactionActions transaction={tx} isAdmin={isAdmin} />
+                    <Link href={`/receipt/${tx.id}`} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Cetak Struk">
                       <Printer className="w-4 h-4" />
                     </Link>
                   </td>
