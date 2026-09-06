@@ -13,6 +13,15 @@ export async function checkVoaNumber(voaNumber: string) {
   return { status: 'AVAILABLE', message: '✓ VOA TERSEDIA', id: voa[0].id };
 }
 
+export async function getAvailableVoas() {
+  const list = await db.select({ voaNumber: voaMaster.voaNumber })
+    .from(voaMaster)
+    .where(eq(voaMaster.status, 'AVAILABLE'))
+    .orderBy(voaMaster.voaNumber)
+    .limit(500); // limit to prevent huge payload
+  return list.map(v => v.voaNumber);
+}
+
 export async function createTransactionAction(formData: FormData) {
   const session = await verifySession();
   if (!session) return { error: 'Unauthorized' };

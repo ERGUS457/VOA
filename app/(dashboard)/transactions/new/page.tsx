@@ -1,14 +1,15 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { checkVoaNumber, createTransactionAction } from './actions';
+import { checkVoaNumber, createTransactionAction, getAvailableVoas } from './actions';
 import WebcamCapture from './WebcamCapture';
-import { Loader2, AlertCircle, CheckCircle2, ChevronRight } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle2, ChevronRight, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import OcrScanner from './OcrScanner';
 
 export default function CreateTransactionPage() {
   const router = useRouter();
   const [voaNumber, setVoaNumber] = useState('');
+  const [availableVoas, setAvailableVoas] = useState<string[]>([]);
   const [voaStatus, setVoaStatus] = useState<{ status: string, message: string } | null>(null);
   const [checking, setChecking] = useState(false);
   const [photoData, setPhotoData] = useState('');
@@ -34,6 +35,10 @@ export default function CreateTransactionPage() {
     if (data.dateOfBirth) setDateOfBirth(data.dateOfBirth);
     if (data.gender) setGender(data.gender);
   };
+
+  useEffect(() => {
+    getAvailableVoas().then(data => setAvailableVoas(data)).catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (!voaNumber) {
@@ -81,15 +86,23 @@ export default function CreateTransactionPage() {
             <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800 border-b pb-2">1. Pilih Nomor VOA</h2>
             <div>
               <div className="relative">
+                <Search className="w-5 h-5 absolute left-4 top-3.5 text-slate-400" />
                 <input 
                   type="text" 
                   name="voaNumber"
                   value={voaNumber}
                   onChange={(e) => setVoaNumber(e.target.value.toUpperCase())}
                   required
-                  placeholder="Ketik Nomor VOA..."
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy focus:border-transparent font-bold text-slate-800 tracking-wide"
+                  list="voa-list"
+                  autoComplete="off"
+                  placeholder="Ketik atau pilih Nomor VOA..."
+                  className="w-full pl-12 pr-12 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy focus:border-transparent font-bold text-slate-800 tracking-wide"
                 />
+                <datalist id="voa-list">
+                  {availableVoas.map(voa => (
+                    <option key={voa} value={voa}>Tersedia</option>
+                  ))}
+                </datalist>
                 {checking && <Loader2 className="w-5 h-5 animate-spin absolute right-4 top-3.5 text-slate-400" />}
               </div>
               {voaStatus && (
