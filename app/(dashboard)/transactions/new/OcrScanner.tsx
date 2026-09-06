@@ -220,7 +220,7 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
     let fullName = '';
     let passportNumber = '';
     let nationality = 'INDONESIA';
-    let gender = 'Male';
+    let gender = '';
     let dateOfBirth = '';
 
     const parseYYMMDD = (yymmdd: string) => {
@@ -237,69 +237,54 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
     };
 
     const textUpper = rawText.toUpperCase();
-    const cleanText = textUpper.replace(/[KC\(\)\[\]\{\}]/g, '<');
+    const cleanLines = textUpper.split('\n').map(l => l.replace(/[\s\(\)\[\]\{\}]/g, '').trim()).filter(Boolean);
 
     // --- STRATEGY 1: MRZ Parsing ---
-    // Look for lines containing <<
-    const lines = cleanText.split('\n').map(l => l.replace(/\s/g, ''));
-    for (const line of lines) {
-      // MRZ Line 1: P<IDNNAME<<SURNAME or loose <<
-      if (line.includes('<<')) {
-        const parts = line.split('<<');
+    for (const line of cleanLines) {
+      // MRZ Line 1: Must start with P (e.g. P<IDN, PASGP, P<MYS) and contain <<
+      if (!fullName && /^P[<A-Z0-9]/.test(line) && line.includes('<<')) {
+        const nameContent = line.replace(/^P[<A-Z0-9]{0,4}/, '');
+        const parts = nameContent.split('<<');
         if (parts.length >= 2) {
-          let part0 = parts[0];
-          // Strip country code if present: P<IDN, P<MYS, etc
-          part0 = part0.replace(/^P<?[A-Z]{3}/, '');
-          const surname = part0.replace(/</g, ' ').trim();
-          const givenName = parts[1].replace(/</g, ' ').trim();
-          if (surname.length > 1 || givenName.length > 1) {
-            fullName = `${givenName} ${surname}`.replace(/[^A-Z\s]/g, '').trim();
+          const surname = parts[0].replace(/</g, ' ').trim();
+          const givenName = parts[1].split('<').filter(Boolean).join(' ').trim();
+          if (surname || givenName) {
+            fullName = `${surname} ${givenName}`.replace(/[^A-Z\s\-]/g, '').trim();
           }
         }
       }
-      
-      // MRZ Line 2: Passport number followed by digits/country and DOB
-      const passMatch = line.match(/([A-Z0-9]{7,9})<*([0-9])[A-Z]{3}([0-9]{6})/);
-      if (passMatch) {
-        if (!passportNumber) passportNumber = passMatch[1].replace(/</g, '').trim();
-        if (!dateOfBirth && passMatch[3]) {
-          dateOfBirth = parseYYMMDD(passMatch[3]);
+
+      // MRZ Line 2: Passport number (7-9 chars) + check digit + country + DOB (6 digits) + check digit + Gender (F/M)
+      const line2Match = line.match(/^([A-Z0-9]{7,9})<*([0-9])?([A-Z]{3}|1DN|ION)?([0-9]{6})[0-9]?(F|M|<)/);
+      if (line2Match) {
+        if (!passportNumber) passportNumber = line2Match[1].replace(/</g, '').trim();
+        if (line2Match[3]) {
+          const c = line2Match[3];
+          if (c.includes('SGP')) nationality = 'SINGAPORE';
+          else if (c.includes('MYS')) nationality = 'MALAYSIA';
+          else if (c.includes('BRN')) nationality = 'BRUNEI';
+          else if (c.includes('IDN') || c.includes('1DN') || c.includes('ION')) nationality = 'INDONESIA';
+        }
+        if (!dateOfBirth && line2Match[4]) {
+          dateOfBirth = parseYYMMDD(line2Match[4]);
+        }
+        if (!gender && line2Match[5]) {
+          if (line2Match[5] === 'F') gender = 'Female';
+          else if (line2Match[5] === 'M') gender = 'Male';
         }
       }
     }
 
-    // --- STRATEGY 2: Visual Inspection Zone (VIZ) Text Matching ---
-    // Look for passport number pattern like A1234567, B1234567, etc (1-2 letters + 7-8 digits)
-    if (!passportNumber) {
-      const matchPass = textUpper.match(/(?:PASSPORT|PASPOR|NO|NUMBER)?[\s.:]*([A-Z][0-9]{7,8})\b/);
-      if (matchPass && matchPass[1]) {
-        passportNumber = matchPass[1];
-      }
-    }
-
-    // Look for name field: "NAMA LENGKAP / FULL NAME" or "NAME"
-    if (!fullName) {
-      const nameMatch = textUpper.match(/(?:NAMA|NAME|FULL NAME)[\s.:]+([A-Z\s]{4,30})(?:\n|$)/);
-      if (nameMatch && nameMatch[1]) {
-        const candidate = nameMatch[1].trim();
-        if (!candidate.includes('REPUBLIK') && !candidate.includes('INDONESIA')) {
-          fullName = candidate;
-        }
-      }
-    }
-
-    // --- STRATEGY 3: Robust Date of Birth Detection ---
-    // Rule A: Direct MRZ pattern: 6 digits (valid YYMMDD) + optional check digit + F or M
-    if (!dateOfBirth) {
+    // Direct MRZ DOB check anywhere in text: 6 digits (valid date) + optional check digit + F or M
+    if (!dateOfBirth || !gender) {
       const mrzDobMatch = textUpper.match(/([0-9]{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12][0-9]|3[01]))[0-9]?(F|M)/);
       if (mrzDobMatch) {
-        dateOfBirth = parseYYMMDD(mrzDobMatch[1]);
-        if (mrzDobMatch[2] === 'F') gender = 'Female';
-        else if (mrzDobMatch[2] === 'M') gender = 'Male';
+        if (!dateOfBirth) dateOfBirth = parseYYMMDD(mrzDobMatch[1]);
+        if (!gender) gender = mrzDobMatch[2] === 'F' ? 'Female' : 'Male';
       }
     }
 
-    // Rule B: MRZ near country code: e.g. IDN900504 or 1DN900504
+    // Direct MRZ near country code
     if (!dateOfBirth) {
       const nearCountry = textUpper.match(/(?:IDN|1DN|ION|MYS|SGP)[<0-9]*([0-9]{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12][0-9]|3[01]))/);
       if (nearCountry) {
@@ -307,14 +292,34 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
       }
     }
 
-    // Rule C: Visual text bilingual date: e.g. "04 MAY / MEI 1990" or "15 JAN 1995"
+    // --- STRATEGY 2: Visual Inspection Zone (VIZ) Text Matching ---
+    // Look for passport number pattern like A1234567, K0000000E, E5179583
+    if (!passportNumber) {
+      const matchPass = textUpper.match(/(?:PASSPORT|PASPOR|NO|NUMBER)?[\s.:]*([A-Z][0-9]{7,8}[A-Z0-9]?)\b/);
+      if (matchPass && matchPass[1]) {
+        passportNumber = matchPass[1];
+      }
+    }
+
+    // Look for name field: "NAME: ..." or "NAMA LENGKAP: ..."
+    if (!fullName) {
+      const nameMatch = textUpper.match(/(?:NAMA|NAME|FULL NAME)[\s.:]+([A-Z\s\-]{3,35})(?:\n|$)/);
+      if (nameMatch && nameMatch[1]) {
+        const candidate = nameMatch[1].trim();
+        if (!candidate.includes('REPUBLIK') && !candidate.includes('INDONESIA') && !candidate.includes('SINGAPORE') && !candidate.includes('PASSPORT')) {
+          fullName = candidate;
+        }
+      }
+    }
+
+    // Look for Date of Birth in visual text if not found in MRZ
     if (!dateOfBirth) {
       const monthMap: Record<string, string> = {
         JAN: '01', FEB: '02', MAR: '03', APR: '04', MAY: '05', MEI: '05',
         JUN: '06', JUL: '07', AUG: '08', AGU: '08', SEP: '09', OCT: '10', OKT: '10',
         NOV: '11', DEC: '12', DES: '12'
       };
-      // Matches bilingual dates like "04 MAY / MEI 1990"
+      // Matches: "03 MAY 1977" or "04 MAY / MEI 1990"
       const bilingualMatch = textUpper.match(/([0-3]?[0-9])[\s\-\/]+(JAN|FEB|MAR|APR|MAY|MEI|JUN|JUL|AUG|AGU|SEP|OCT|OKT|NOV|DEC|DES)(?:[\s\-\/]+(?:JAN|FEB|MAR|APR|MAY|MEI|JUN|JUL|AUG|AGU|SEP|OCT|OKT|NOV|DEC|DES))?[\s\-\/]+(19[4-9][0-9]|20[0-2][0-9])/);
       if (bilingualMatch) {
         const dd = bilingualMatch[1].padStart(2, '0');
@@ -333,16 +338,18 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
       }
     }
 
-    // Nationality
-    if (textUpper.includes('MALAYSIA') || textUpper.includes('MYS')) nationality = 'MALAYSIA';
-    else if (textUpper.includes('SINGAPORE') || textUpper.includes('SGP')) nationality = 'SINGAPORE';
+    // Nationality from visual text
+    if (textUpper.includes('SINGAPORE') || textUpper.includes('SGP')) nationality = 'SINGAPORE';
+    else if (textUpper.includes('MALAYSIA') || textUpper.includes('MYS')) nationality = 'MALAYSIA';
     else if (textUpper.includes('BRUNEI') || textUpper.includes('BRN')) nationality = 'BRUNEI';
     else if (textUpper.includes('INDONESIA') || textUpper.includes('IDN')) nationality = 'INDONESIA';
 
-    // Gender
-    if (textUpper.match(/\b(P|F|FEMALE|PEREMPUAN)\b/)) gender = 'Female';
-    else if (textUpper.match(/\b(L|M|MALE|LAKI)\b/)) gender = 'Male';
-    else gender = 'Male';
+    // Gender fallback if not detected from MRZ
+    if (!gender) {
+      if (textUpper.match(/\b(SEX[\s.:]*F|FEMALE|PEREMPUAN)\b/)) gender = 'Female';
+      else if (textUpper.match(/\b(SEX[\s.:]*M|MALE|LAKI)\b/)) gender = 'Male';
+      else gender = 'Female';
+    }
 
     if (fullName || passportNumber || dateOfBirth) {
       return { fullName, passportNumber, nationality, gender, dateOfBirth };
