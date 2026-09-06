@@ -5,7 +5,7 @@ import Script from 'next/script';
 export const metadata: Metadata = { title: 'VOA PLBN Aruk', description: 'Sistem Pelayanan Visa On Arrival' };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="id">
+    <html lang="id" className="text-[14px]">
       <head>
         <link href="https://cdn.datatables.net/v/dt/dt-3.0.3/datatables.min.css" rel="stylesheet" />
       </head>
