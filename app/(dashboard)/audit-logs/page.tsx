@@ -35,9 +35,9 @@ export default async function AuditLogsPage() {
               <th className="px-4 py-3">Waktu</th>
               <th className="px-4 py-3">User</th>
               <th className="px-4 py-3">Aksi</th>
-              <th className="px-4 py-3">Entitas</th>
-              <th className="px-4 py-3">ID Target</th>
-              <th className="px-4 py-3">Detail</th>
+              <th className="px-4 py-3">Target VOA</th>
+              <th className="px-4 py-3">Deskripsi</th>
+              <th className="px-4 py-3">IP Address</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -60,9 +60,9 @@ export default async function AuditLogsPage() {
                       {log.action}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm font-semibold">{log.entityType}</td>
-                  <td className="px-4 py-3 text-xs font-mono text-slate-500">{log.entityId}</td>
-                  <td className="px-4 py-3 text-xs max-w-xs truncate" title={log.details || ''}>{log.details || '-'}</td>
+                  <td className="px-4 py-3 text-sm font-semibold">{log.voaId || '-'}</td>
+                  <td className="px-4 py-3 text-xs max-w-xs truncate" title={log.description || ''}>{log.description || '-'}</td>
+                  <td className="px-4 py-3 text-xs font-mono text-slate-500">{log.ipAddress || '-'}</td>
                 </tr>
               );
             })}
