@@ -21,14 +21,12 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
       // 1. Init AI Worker
       setProgress('Memuat model AI (Tesseract)...');
       const worker = await createWorker('eng');
-      await worker.setParameters({
-        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<',
-      });
       workerRef.current = worker;
 
       // 2. Init Camera
       setProgress('Mengakses kamera...');
-      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      // Remove facingMode: 'environment' because on laptops it can cause a black screen
+      const s = await navigator.mediaDevices.getUserMedia({ video: true });
       streamRef.current = s;
       if (videoRef.current) {
         videoRef.current.srcObject = s;
@@ -115,48 +113,51 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
   };
 
   const parseMRZ = (text: string) => {
-    // Basic cleaning to help Tesseract errors
-    const cleanedText = text.replace(/\s/g, '').replace(/K/g, '<').replace(/C/g, '<').toUpperCase();
-    const lines = cleanedText.split('\n').filter(l => l.length > 0);
-    
-    // Find the MRZ lines (they usually start with P< and have a lot of <)
-    let line1 = lines.find(l => l.startsWith('P') && l.includes('<<') && l.length > 20);
-    let line2 = lines.find(l => l.match(/^[A-Z0-9<]{8,}/) && !l.startsWith('P') && l.length > 20);
+    // Clean text aggressively
+    const cleanedText = text.toUpperCase()
+      .replace(/\s/g, '')
+      .replace(/[KC\(\)\[\]\{\}]/g, '<'); 
+      // Tesseract often reads < as K, C, or brackets
 
-    // Fallback logic if we just have a lot of lines
-    if (!line1 || !line2) {
-      const mrzLines = lines.filter(l => l.includes('<<<'));
-      if (mrzLines.length >= 2) {
-        line1 = mrzLines[0];
-        line2 = mrzLines[mrzLines.length - 1];
+    // Extract Name
+    let fullName = '';
+    const nameMatch = cleanedText.match(/P<?[A-Z]{3}([A-Z0-9<]+)<<([A-Z0-9<]+)/);
+    if (nameMatch) {
+      const surname = nameMatch[1].replace(/</g, ' ').trim();
+      const givenName = nameMatch[2].replace(/</g, ' ').trim();
+      fullName = `${givenName} ${surname}`.trim();
+    } else {
+      // Fallback name search if P<IDN is mangled
+      const looseNameMatch = cleanedText.match(/([A-Z]+)<<([A-Z<]+)/);
+      if (looseNameMatch && looseNameMatch[1].length > 3) {
+        const surname = looseNameMatch[1].replace(/</g, ' ').trim();
+        const givenName = looseNameMatch[2].replace(/</g, ' ').trim();
+        fullName = `${givenName} ${surname}`.trim();
       }
+    }
+
+    // Extract Passport Number
+    let passportNumber = '';
+    // Look for 7-9 alphanumeric characters followed by optional < and then a country code like IDN/MYS
+    const passMatch = cleanedText.match(/([A-Z0-9]{7,9})<?[0-9]?[A-Z]{3}/);
+    if (passMatch) {
+      passportNumber = passMatch[1].replace(/</g, '');
+    }
+
+    // Determine Gender
+    let gender = 'Other';
+    if (cleanedText.includes('M')) gender = 'Male';
+    if (cleanedText.includes('F')) gender = 'Female';
+
+    if (fullName || passportNumber) {
+      return {
+        fullName: fullName || '-',
+        passportNumber: passportNumber || '-',
+        nationality: cleanedText.includes('MYS') ? 'MALAYSIA' : cleanedText.includes('SGP') ? 'SINGAPORE' : 'INDONESIA',
+        gender
+      };
     }
     
-    if (line1 && line2) {
-      try {
-        // Parsing line 1: P<IDNNAME<<SURNAME...
-        const namePart = line1.substring(5).split('<<');
-        const surname = namePart[0].replace(/</g, ' ').trim();
-        const givenName = namePart[1] ? namePart[1].replace(/</g, ' ').trim() : '';
-        const fullName = `${givenName} ${surname}`.trim();
-        
-        // Parsing line 2: PASSPORTNO<XIDN8001014M2501019...
-        const passportNumber = line2.substring(0, 9).replace(/</g, '');
-        const nationality = line2.substring(10, 13);
-        const genderCode = line2.substring(20, 21);
-        
-        const natMap: Record<string, string> = { 'IDN': 'INDONESIA', 'MYS': 'MALAYSIA', 'SGP': 'SINGAPORE' };
-        
-        return {
-          fullName: fullName || '-',
-          passportNumber: passportNumber || '-',
-          nationality: natMap[nationality] || nationality,
-          gender: genderCode === 'M' ? 'Male' : genderCode === 'F' ? 'Female' : 'Other'
-        };
-      } catch (e) {
-        return null;
-      }
-    }
     return null;
   };
 
