@@ -10,7 +10,7 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
   const [progress, setProgress] = useState('Menyiapkan Kamera & AI...');
   const [error, setError] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [detectedData, setDetectedData] = useState<{ fullName?: string; passportNumber?: string; nationality?: string; gender?: string } | null>(null);
+  const [detectedData, setDetectedData] = useState<{ fullName?: string; passportNumber?: string; nationality?: string; gender?: string; dateOfBirth?: string } | null>(null);
   
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -221,6 +221,20 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
     let passportNumber = '';
     let nationality = 'INDONESIA';
     let gender = 'Male';
+    let dateOfBirth = '';
+
+    const parseYYMMDD = (yymmdd: string) => {
+      if (!/^\d{6}$/.test(yymmdd)) return '';
+      const yy = parseInt(yymmdd.substring(0, 2), 10);
+      const mm = yymmdd.substring(2, 4);
+      const dd = yymmdd.substring(4, 6);
+      const mNum = parseInt(mm, 10);
+      const dNum = parseInt(dd, 10);
+      if (mNum < 1 || mNum > 12 || dNum < 1 || dNum > 31) return '';
+      const currentYY = new Date().getFullYear() % 100;
+      const year = yy > currentYY ? 1900 + yy : 2000 + yy;
+      return `${year}-${mm}-${dd}`;
+    };
 
     const textUpper = rawText.toUpperCase();
     const cleanText = textUpper.replace(/[KC\(\)\[\]\{\}]/g, '<');
@@ -244,10 +258,13 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
         }
       }
       
-      // MRZ Line 2: Passport number followed by digits/country
-      const passMatch = line.match(/([A-Z0-9]{7,9})<*([0-9])[A-Z]{3}/);
-      if (passMatch && !passportNumber) {
-        passportNumber = passMatch[1].replace(/</g, '').trim();
+      // MRZ Line 2: Passport number followed by digits/country and DOB
+      const passMatch = line.match(/([A-Z0-9]{7,9})<*([0-9])[A-Z]{3}([0-9]{6})/);
+      if (passMatch) {
+        if (!passportNumber) passportNumber = passMatch[1].replace(/</g, '').trim();
+        if (!dateOfBirth && passMatch[3]) {
+          dateOfBirth = parseYYMMDD(passMatch[3]);
+        }
       }
     }
 
@@ -271,6 +288,32 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
       }
     }
 
+    // Look for Date of Birth in visual text if not found in MRZ
+    if (!dateOfBirth) {
+      const monthMap: Record<string, string> = {
+        JAN: '01', FEB: '02', MAR: '03', APR: '04', MAY: '05', MEI: '05',
+        JUN: '06', JUL: '07', AUG: '08', AGU: '08', SEP: '09', OCT: '10', OKT: '10',
+        NOV: '11', DEC: '12', DES: '12'
+      };
+      // Format: 15 JAN 1990 or 15-JAN-1990
+      const vizMatch = textUpper.match(/\b([0-3]?[0-9])[\s\-\/]+(JAN|FEB|MAR|APR|MAY|MEI|JUN|JUL|AUG|AGU|SEP|OCT|OKT|NOV|DEC|DES)[\s\-\/]+(19[4-9][0-9]|20[0-2][0-9])\b/);
+      if (vizMatch) {
+        const dd = vizMatch[1].padStart(2, '0');
+        const mm = monthMap[vizMatch[2]] || '01';
+        const yyyy = vizMatch[3];
+        dateOfBirth = `${yyyy}-${mm}-${dd}`;
+      } else {
+        // Format: 15/01/1990 or 15-01-1990
+        const numDateMatch = textUpper.match(/\b([0-3]?[0-9])[\/\-]([0-1]?[0-9])[\/\-](19[4-9][0-9]|20[0-2][0-9])\b/);
+        if (numDateMatch) {
+          const dd = numDateMatch[1].padStart(2, '0');
+          const mm = numDateMatch[2].padStart(2, '0');
+          const yyyy = numDateMatch[3];
+          dateOfBirth = `${yyyy}-${mm}-${dd}`;
+        }
+      }
+    }
+
     // Nationality
     if (textUpper.includes('MALAYSIA') || textUpper.includes('MYS')) nationality = 'MALAYSIA';
     else if (textUpper.includes('SINGAPORE') || textUpper.includes('SGP')) nationality = 'SINGAPORE';
@@ -282,8 +325,8 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
     else if (textUpper.match(/\b(L|M|MALE|LAKI)\b/)) gender = 'Male';
     else gender = 'Male';
 
-    if (fullName || passportNumber) {
-      return { fullName, passportNumber, nationality, gender };
+    if (fullName || passportNumber || dateOfBirth) {
+      return { fullName, passportNumber, nationality, gender, dateOfBirth };
     }
 
     return null;
@@ -433,7 +476,7 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Data Berhasil Ditemukan!
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="grid grid-cols-2 gap-2.5 text-xs">
                     <div>
                       <span className="text-slate-500 font-semibold block">Nomor Paspor:</span>
                       <span className="font-bold text-slate-800 text-sm font-mono">{detectedData.passportNumber || '-'}</span>
@@ -442,9 +485,18 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
                       <span className="text-slate-500 font-semibold block">Kewarganegaraan:</span>
                       <span className="font-bold text-slate-800 text-sm">{detectedData.nationality || '-'}</span>
                     </div>
-                    <div>
+                    <div className="col-span-2">
                       <span className="text-slate-500 font-semibold block">Nama Lengkap:</span>
                       <span className="font-bold text-slate-800 text-sm uppercase">{detectedData.fullName || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 font-semibold block">Tanggal Lahir:</span>
+                      <input 
+                        type="date" 
+                        value={detectedData.dateOfBirth || ''} 
+                        onChange={(e) => setDetectedData({ ...detectedData, dateOfBirth: e.target.value })}
+                        className="font-bold text-slate-800 text-xs bg-white border border-slate-300 rounded px-2 py-1 mt-0.5 w-full outline-none focus:ring-1 focus:ring-emerald-500"
+                      />
                     </div>
                     <div>
                       <span className="text-slate-500 font-semibold block">Jenis Kelamin:</span>
