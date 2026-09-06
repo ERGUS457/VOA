@@ -11,13 +11,18 @@ export default function WebcamCapture({ onCapture }: { onCapture: (base64: strin
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
       setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
     } catch (err) {
       alert('Kamera tidak dapat diakses.');
     }
   };
+
+  const setVideoRef = useCallback((node: HTMLVideoElement | null) => {
+    videoRef.current = node;
+    if (node && stream) {
+      node.srcObject = stream;
+      node.play().catch(e => console.log('Video play error:', e));
+    }
+  }, [stream]);
 
   const capturePhoto = useCallback(() => {
     if (videoRef.current) {
@@ -73,7 +78,7 @@ export default function WebcamCapture({ onCapture }: { onCapture: (base64: strin
       )}
       {stream && !capturedImg && (
         <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden shadow-inner">
-          <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+          <video ref={setVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
           <button type="button" onClick={capturePhoto} className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white text-navy-dark px-6 py-2.5 rounded-full font-bold shadow-xl hover:scale-105 active:scale-95 transition-transform">
             AMBIL FOTO
           </button>
