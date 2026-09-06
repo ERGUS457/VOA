@@ -3,7 +3,7 @@ import { useRef, useState, useCallback } from 'react';
 import { Camera, Image as ImageIcon, RotateCcw, Check } from 'lucide-react';
 
 export default function WebcamCapture({ onCapture }: { onCapture: (base64: string) => void }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturedImg, setCapturedImg] = useState<string | null>(null);
 
