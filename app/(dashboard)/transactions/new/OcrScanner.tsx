@@ -274,9 +274,12 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
     // ==========================================
     // Strategy A: ICAO Universal MRZ Line 1 (P<XXXSURNAME<<GIVEN_NAMES<<<<)
     for (const line of lines) {
+      // Tesseract often reads < as C, K, (, or E
+      const normalizedLine = line.replace(/[KCE\(\[\{]/g, '<');
+      
       // Must start with P (e.g. P<IDN, PASGP, P<MYS) and contain <<
-      if (/^P[<A-Z0-9]/.test(line) && line.includes('<<')) {
-        const clean = line.replace(/^P[<A-Z0-9]{0,4}/, '');
+      if (/^P[<A-Z0-9]/.test(normalizedLine) && normalizedLine.includes('<<')) {
+        const clean = normalizedLine.replace(/^P[<A-Z0-9]{0,4}/, '');
         const parts = clean.split('<<');
         if (parts.length >= 2) {
           const p1 = parts[0].replace(/[^A-Z]/g, '').trim();
@@ -332,6 +335,11 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
           }
         }
       }
+    }
+    
+    // Explicitly reject known watermark hallucinations
+    if (fullName === 'RE PA AER' || fullName === 'RE PAAER' || fullName === 'RE PA') {
+      fullName = '';
     }
 
     // ==========================================
