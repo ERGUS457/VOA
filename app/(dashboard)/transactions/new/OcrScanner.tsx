@@ -108,6 +108,10 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       try {
         const result = await workerRef.current.recognize(canvas);
+        
+        // Check if scanning was stopped (e.g. user clicked upload or capture) while we were processing
+        if (!isScanningActive.current) return;
+        
         const parsed = parsePassportText(result.data.text);
         if (parsed && (parsed.passportNumber || parsed.fullName)) {
           // Found match!
@@ -636,7 +640,13 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
               <div className="pt-2 border-t border-slate-100">
                 <label className="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-300 py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-xs">
                   <Upload className="w-4 h-4 text-slate-500" /> PILIH FOTO DARI LAPTOP / HP
-                  <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onClick={() => { isScanningActive.current = false; clearTimeout(scanTimerRef.current); }}
+                    onChange={handleFileUpload} 
+                    className="hidden" 
+                  />
                 </label>
               </div>
 
