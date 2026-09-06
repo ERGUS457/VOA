@@ -288,23 +288,42 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
       }
     }
 
-    // Look for Date of Birth in visual text if not found in MRZ
+    // --- STRATEGY 3: Robust Date of Birth Detection ---
+    // Rule A: Direct MRZ pattern: 6 digits (valid YYMMDD) + optional check digit + F or M
+    if (!dateOfBirth) {
+      const mrzDobMatch = textUpper.match(/([0-9]{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12][0-9]|3[01]))[0-9]?(F|M)/);
+      if (mrzDobMatch) {
+        dateOfBirth = parseYYMMDD(mrzDobMatch[1]);
+        if (mrzDobMatch[2] === 'F') gender = 'Female';
+        else if (mrzDobMatch[2] === 'M') gender = 'Male';
+      }
+    }
+
+    // Rule B: MRZ near country code: e.g. IDN900504 or 1DN900504
+    if (!dateOfBirth) {
+      const nearCountry = textUpper.match(/(?:IDN|1DN|ION|MYS|SGP)[<0-9]*([0-9]{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12][0-9]|3[01]))/);
+      if (nearCountry) {
+        dateOfBirth = parseYYMMDD(nearCountry[1]);
+      }
+    }
+
+    // Rule C: Visual text bilingual date: e.g. "04 MAY / MEI 1990" or "15 JAN 1995"
     if (!dateOfBirth) {
       const monthMap: Record<string, string> = {
         JAN: '01', FEB: '02', MAR: '03', APR: '04', MAY: '05', MEI: '05',
         JUN: '06', JUL: '07', AUG: '08', AGU: '08', SEP: '09', OCT: '10', OKT: '10',
         NOV: '11', DEC: '12', DES: '12'
       };
-      // Format: 15 JAN 1990 or 15-JAN-1990
-      const vizMatch = textUpper.match(/\b([0-3]?[0-9])[\s\-\/]+(JAN|FEB|MAR|APR|MAY|MEI|JUN|JUL|AUG|AGU|SEP|OCT|OKT|NOV|DEC|DES)[\s\-\/]+(19[4-9][0-9]|20[0-2][0-9])\b/);
-      if (vizMatch) {
-        const dd = vizMatch[1].padStart(2, '0');
-        const mm = monthMap[vizMatch[2]] || '01';
-        const yyyy = vizMatch[3];
+      // Matches bilingual dates like "04 MAY / MEI 1990"
+      const bilingualMatch = textUpper.match(/([0-3]?[0-9])[\s\-\/]+(JAN|FEB|MAR|APR|MAY|MEI|JUN|JUL|AUG|AGU|SEP|OCT|OKT|NOV|DEC|DES)(?:[\s\-\/]+(?:JAN|FEB|MAR|APR|MAY|MEI|JUN|JUL|AUG|AGU|SEP|OCT|OKT|NOV|DEC|DES))?[\s\-\/]+(19[4-9][0-9]|20[0-2][0-9])/);
+      if (bilingualMatch) {
+        const dd = bilingualMatch[1].padStart(2, '0');
+        const mm = monthMap[bilingualMatch[2]] || '01';
+        const yyyy = bilingualMatch[3];
         dateOfBirth = `${yyyy}-${mm}-${dd}`;
       } else {
-        // Format: 15/01/1990 or 15-01-1990
-        const numDateMatch = textUpper.match(/\b([0-3]?[0-9])[\/\-]([0-1]?[0-9])[\/\-](19[4-9][0-9]|20[0-2][0-9])\b/);
+        // Numeric date format: 04/05/1990 or 04-05-1990
+        const numDateMatch = textUpper.match(/([0-3]?[0-9])[\/\-\.](0[1-9]|1[0-2])[\/\-\.](19[4-9][0-9]|20[0-2][0-9])/);
         if (numDateMatch) {
           const dd = numDateMatch[1].padStart(2, '0');
           const mm = numDateMatch[2].padStart(2, '0');
