@@ -1,13 +1,14 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { createWorker, Worker } from 'tesseract.js';
-import { Scan, X, Loader2, Upload } from 'lucide-react';
+import { Scan, X, Loader2, Upload, AlertCircle } from 'lucide-react';
 
 export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [progress, setProgress] = useState('Menginisialisasi Kamera & AI...');
   const [error, setError] = useState('');
+  const [rawText, setRawText] = useState('');
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -20,6 +21,9 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
       // 1. Init AI Worker
       setProgress('Memuat model AI (Tesseract)...');
       const worker = await createWorker('eng');
+      await worker.setParameters({
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<',
+      });
       workerRef.current = worker;
 
       // 2. Init Camera
@@ -28,12 +32,16 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
       streamRef.current = s;
       if (videoRef.current) {
         videoRef.current.srcObject = s;
+        // Ensure play on iOS
+        videoRef.current.setAttribute('playsinline', 'true');
       }
       
       setIsReady(true);
       setProgress('');
     } catch (err) {
-      setError('Gagal menginisialisasi sistem. Pastikan izin kamera diberikan.');
+      console.error(err);
+      setError('Gagal menginisialisasi kamera. Pastikan browser memiliki izin akses kamera.');
+      setIsReady(true); // Let them use upload fallback
     }
   };
 
@@ -57,60 +65,82 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
 
       try {
         const result = await workerRef.current.recognize(dataUrl);
-        const parsed = parseMRZ(result.data.text);
+        const text = result.data.text;
+        
+        if (text.includes('<')) {
+           setRawText(text.replace(/\n/g, ' '));
+        }
+
+        const parsed = parseMRZ(text);
         
         if (parsed) {
           onScan(parsed);
           closeModal();
-          return; // Stop scanning
+          return;
         }
       } catch (e) {
         // Silently ignore frame errors
       }
     }
 
-    // Schedule next frame if still scanning
     if (isScanningRef.current) {
-      scanLoopRef.current = setTimeout(scanLoop, 800); // Scan every 800ms
+      scanLoopRef.current = setTimeout(scanLoop, 1000); // Reduce frequency to 1s to save CPU
     }
   };
 
   const processFile = async (file: File) => {
     if (!workerRef.current) return;
-    isScanningRef.current = false; // pause auto scan
+    isScanningRef.current = false;
     setProgress('Membaca gambar...');
     setIsReady(false);
+    setError('');
     
     try {
       const result = await workerRef.current.recognize(file);
-      const parsed = parseMRZ(result.data.text);
+      const text = result.data.text;
+      setRawText(text);
+
+      const parsed = parseMRZ(text);
       if (parsed) {
         onScan(parsed);
         closeModal();
       } else {
-        setError('Data MRZ tidak terdeteksi pada gambar ini.');
+        setError('Gagal mengekstrak data dari paspor ini. Pastikan gambar tidak buram dan kode MRZ di bagian bawah terlihat penuh.');
         setIsReady(true);
       }
     } catch (e) {
-      setError('Gagal memproses gambar.');
+      setError('Terjadi kesalahan saat memproses gambar.');
       setIsReady(true);
     }
   };
 
   const parseMRZ = (text: string) => {
-    const lines = text.split('\n').map(l => l.replace(/\s/g, ''));
-    const mrzLines = lines.filter(l => l.length >= 40 && l.includes('<'));
+    // Basic cleaning to help Tesseract errors
+    const cleanedText = text.replace(/\s/g, '').replace(/K/g, '<').replace(/C/g, '<').toUpperCase();
+    const lines = cleanedText.split('\n').filter(l => l.length > 0);
     
-    if (mrzLines.length >= 2) {
-      const line1 = mrzLines[mrzLines.length - 2];
-      const line2 = mrzLines[mrzLines.length - 1];
-      
+    // Find the MRZ lines (they usually start with P< and have a lot of <)
+    let line1 = lines.find(l => l.startsWith('P') && l.includes('<<') && l.length > 20);
+    let line2 = lines.find(l => l.match(/^[A-Z0-9<]{8,}/) && !l.startsWith('P') && l.length > 20);
+
+    // Fallback logic if we just have a lot of lines
+    if (!line1 || !line2) {
+      const mrzLines = lines.filter(l => l.includes('<<<'));
+      if (mrzLines.length >= 2) {
+        line1 = mrzLines[0];
+        line2 = mrzLines[mrzLines.length - 1];
+      }
+    }
+    
+    if (line1 && line2) {
       try {
+        // Parsing line 1: P<IDNNAME<<SURNAME...
         const namePart = line1.substring(5).split('<<');
         const surname = namePart[0].replace(/</g, ' ').trim();
         const givenName = namePart[1] ? namePart[1].replace(/</g, ' ').trim() : '';
         const fullName = `${givenName} ${surname}`.trim();
         
+        // Parsing line 2: PASSPORTNO<XIDN8001014M2501019...
         const passportNumber = line2.substring(0, 9).replace(/</g, '');
         const nationality = line2.substring(10, 13);
         const genderCode = line2.substring(20, 21);
@@ -118,8 +148,8 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
         const natMap: Record<string, string> = { 'IDN': 'INDONESIA', 'MYS': 'MALAYSIA', 'SGP': 'SINGAPORE' };
         
         return {
-          fullName,
-          passportNumber,
+          fullName: fullName || '-',
+          passportNumber: passportNumber || '-',
           nationality: natMap[nationality] || nationality,
           gender: genderCode === 'M' ? 'Male' : genderCode === 'F' ? 'Female' : 'Other'
         };
@@ -134,6 +164,7 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
     setIsOpen(true);
     setIsReady(false);
     setError('');
+    setRawText('');
     initSystem();
   };
 
@@ -152,7 +183,6 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
     }
   };
 
-  // Cleanup on unmount just in case
   useEffect(() => {
     return () => {
       isScanningRef.current = false;
@@ -181,7 +211,7 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
             </div>
             
             <div className="p-6 space-y-4 text-center">
-              {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm font-semibold">{error}</div>}
+              {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm font-semibold text-left">{error}</div>}
               
               {!isReady ? (
                 <div className="py-12 flex flex-col items-center">
@@ -192,15 +222,16 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
               ) : (
                 <>
                   <div className="relative rounded-xl overflow-hidden bg-slate-900 aspect-video flex items-center justify-center border-4 border-slate-200">
+                    {/* Add muted so browser autoplay policies do not block video rendering */}
                     <video 
                       ref={videoRef} 
                       autoPlay 
                       playsInline 
+                      muted
                       onPlay={startAutoScan}
                       className="w-full h-full object-cover" 
                     />
                     
-                    {/* Scanner Overlay UI */}
                     <div className="absolute inset-0 border-[6px] border-emerald-500/30"></div>
                     <div className="absolute bottom-4 left-4 right-4 h-20 border-2 border-dashed border-emerald-400 bg-emerald-400/10 rounded flex items-center justify-center">
                       <div className="text-emerald-400 text-xs font-bold bg-slate-900/50 px-3 py-1 rounded">
@@ -208,15 +239,23 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
                       </div>
                     </div>
                     
-                    {/* Scanning indicator */}
-                    <div className="absolute top-4 right-4 flex items-center gap-2 bg-slate-900/60 px-3 py-1.5 rounded-full">
-                      <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                      <span className="text-[10px] text-white font-bold tracking-wider">SCANNING...</span>
-                    </div>
+                    {streamRef.current && (
+                      <div className="absolute top-4 right-4 flex items-center gap-2 bg-slate-900/60 px-3 py-1.5 rounded-full">
+                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                        <span className="text-[10px] text-white font-bold tracking-wider">SCANNING...</span>
+                      </div>
+                    )}
                   </div>
                   
+                  {rawText && (
+                    <div className="bg-slate-100 p-3 rounded-lg text-left overflow-hidden">
+                      <p className="text-[10px] font-bold text-slate-500 mb-1 flex items-center gap-1"><AlertCircle className="w-3 h-3"/> Teks yang Terdeteksi AI:</p>
+                      <p className="text-xs font-mono text-slate-800 break-all">{rawText}</p>
+                    </div>
+                  )}
+
                   <div className="flex justify-center mt-4">
-                    <label className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold flex items-center gap-2 cursor-pointer shadow-sm border border-slate-200 w-full justify-center">
+                    <label className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold flex items-center gap-2 cursor-pointer shadow-sm border border-slate-200 w-full justify-center transition-colors">
                       <Upload className="w-5 h-5" /> ATAU UPLOAD GAMBAR PASPOR
                       <input type="file" accept="image/*" onChange={(e) => e.target.files && processFile(e.target.files[0])} className="hidden" />
                     </label>
