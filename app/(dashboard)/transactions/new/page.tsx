@@ -20,14 +20,19 @@ export default function CreateTransactionPage() {
   const totalAmount = voaPrice + serviceFee;
   const formatRp = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
 
+  const [passportNumber, setPassportNumber] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [nationality, setNationality] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [gender, setGender] = useState('');
+
   const handleOcrScan = (data: any) => {
-    const form = document.querySelector('form');
-    if (form) {
-      if (data.fullName) (form.elements.namedItem('fullName') as HTMLInputElement).value = data.fullName;
-      if (data.passportNumber) (form.elements.namedItem('passportNumber') as HTMLInputElement).value = data.passportNumber;
-      if (data.nationality) (form.elements.namedItem('nationality') as HTMLInputElement).value = data.nationality;
-      if (data.gender) (form.elements.namedItem('gender') as HTMLSelectElement).value = data.gender;
-    }
+    console.log('Received OCR data into form:', data);
+    if (data.passportNumber) setPassportNumber(data.passportNumber);
+    if (data.fullName) setFullName(data.fullName);
+    if (data.nationality) setNationality(data.nationality);
+    if (data.dateOfBirth) setDateOfBirth(data.dateOfBirth);
+    if (data.gender) setGender(data.gender);
   };
 
   useEffect(() => {
@@ -103,23 +108,56 @@ export default function CreateTransactionPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Nomor Paspor *</label>
-                <input type="text" name="passportNumber" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy font-bold uppercase" />
+                <input 
+                  type="text" 
+                  name="passportNumber" 
+                  value={passportNumber}
+                  onChange={(e) => setPassportNumber(e.target.value.toUpperCase())}
+                  required 
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy font-bold uppercase" 
+                />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Nama Lengkap *</label>
-                <input type="text" name="fullName" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy font-bold uppercase" />
+                <input 
+                  type="text" 
+                  name="fullName" 
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value.toUpperCase())}
+                  required 
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy font-bold uppercase" 
+                />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Kewarganegaraan *</label>
-                <input type="text" name="nationality" required placeholder="Ketik kewarganegaraan (contoh: MALAYSIA)" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy font-bold uppercase" />
+                <input 
+                  type="text" 
+                  name="nationality" 
+                  value={nationality}
+                  onChange={(e) => setNationality(e.target.value.toUpperCase())}
+                  required 
+                  placeholder="Ketik kewarganegaraan (contoh: MALAYSIA)" 
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy font-bold uppercase" 
+                />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Tanggal Lahir</label>
-                <input type="date" name="dateOfBirth" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy font-medium text-slate-700" />
+                <input 
+                  type="date" 
+                  name="dateOfBirth" 
+                  value={dateOfBirth}
+                  onChange={(e) => setDateOfBirth(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy font-medium text-slate-700" 
+                />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Jenis Kelamin</label>
-                <select name="gender" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy font-medium text-slate-700">
+                <select 
+                  name="gender" 
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy font-medium text-slate-700"
+                >
                   <option value="">-- Pilih --</option>
                   <option value="Male">Laki-laki (Male)</option>
                   <option value="Female">Perempuan (Female)</option>

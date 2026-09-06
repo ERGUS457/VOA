@@ -280,6 +280,7 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
     // Gender
     if (textUpper.match(/\b(P|F|FEMALE|PEREMPUAN)\b/)) gender = 'Female';
     else if (textUpper.match(/\b(L|M|MALE|LAKI)\b/)) gender = 'Male';
+    else gender = 'Male';
 
     if (fullName || passportNumber) {
       return { fullName, passportNumber, nationality, gender };
@@ -288,11 +289,17 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
     return null;
   };
 
-  const applyDetectedData = () => {
+  const applyDetectedData = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (detectedData) {
-      onScan(detectedData);
-      closeModal();
+      try {
+        onScan(detectedData);
+      } catch (err) {
+        console.error('Failed to send OCR data to form:', err);
+      }
     }
+    closeModal();
   };
 
   const openModal = () => {
@@ -302,6 +309,8 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
 
   const closeModal = () => {
     setIsOpen(false);
+    setPreviewImage(null);
+    setDetectedData(null);
     isScanningActive.current = false;
     clearTimeout(scanTimerRef.current);
     
@@ -309,15 +318,19 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
-    if (workerRef.current) {
-      workerRef.current.terminate();
-      workerRef.current = null;
-    }
   };
 
   useEffect(() => {
     return () => {
       isScanningActive.current = false;
+      clearTimeout(scanTimerRef.current);
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+      if (workerRef.current) {
+        workerRef.current.terminate().catch(() => {});
+        workerRef.current = null;
+      }
+    };
+  }, []);
       clearTimeout(scanTimerRef.current);
       if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
       if (workerRef.current) workerRef.current.terminate();
@@ -434,16 +447,28 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
                       <span className="text-slate-500 font-semibold block">Kewarganegaraan:</span>
                       <span className="font-bold text-slate-800 text-sm">{detectedData.nationality || '-'}</span>
                     </div>
-                    <div className="col-span-2">
+                    <div>
                       <span className="text-slate-500 font-semibold block">Nama Lengkap:</span>
                       <span className="font-bold text-slate-800 text-sm uppercase">{detectedData.fullName || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 font-semibold block">Jenis Kelamin:</span>
+                      <select 
+                        value={detectedData.gender || 'Male'} 
+                        onChange={(e) => setDetectedData({ ...detectedData, gender: e.target.value })}
+                        className="font-bold text-slate-800 text-xs bg-white border border-slate-300 rounded px-2 py-1 mt-0.5 w-full outline-none focus:ring-1 focus:ring-emerald-500"
+                      >
+                        <option value="Male">Laki-laki (Male)</option>
+                        <option value="Female">Perempuan (Female)</option>
+                        <option value="Other">Lainnya</option>
+                      </select>
                     </div>
                   </div>
 
                   <button 
                     type="button" 
                     onClick={applyDetectedData} 
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg text-xs flex items-center justify-center gap-2 shadow"
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg text-xs flex items-center justify-center gap-2 shadow cursor-pointer transition-colors active:scale-[0.98]"
                   >
                     GUNAKAN DATA INI KE FORMULIR
                   </button>
