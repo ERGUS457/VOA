@@ -1,4 +1,5 @@
 import SidebarMenu from './SidebarMenu';
+import LiveClock from './LiveClock';
 import { LogOut } from 'lucide-react';
 import { verifySession, deleteSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
@@ -44,9 +45,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <main className="flex-1 ml-64 flex flex-col min-h-screen">
         {/* Header */}
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-10">
-          <div className="text-slate-500 font-medium font-mono text-sm">
-            {/* Live clock handled by client component theoretically, but for layout we just put static or let it be handled later */}
-            <span id="live-clock" suppressHydrationWarning>{new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB</span>
+          <div>
+            <LiveClock />
           </div>
           
           <div className="flex items-center gap-4">
