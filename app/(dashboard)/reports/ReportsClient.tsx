@@ -177,6 +177,29 @@ export default function ReportsClient({ transactions }: { transactions: any[] })
             margin: 0;
             padding: 0;
           }
+          /* Hide DataTables wrappers during print */
+          .dt-container .dt-layout-row:not(:has(table)) {
+            display: none !important;
+          }
+          .dt-search, .dt-length, .dt-info, .dt-paging {
+            display: none !important;
+          }
+          /* Re-layout metrics for print */
+          .grid.gap-4 {
+            display: flex !important;
+            justify-content: space-between !important;
+            gap: 1rem !important;
+            margin-bottom: 2rem !important;
+          }
+          .grid.gap-4 > div {
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            text-align: center !important;
+          }
+          table {
+            width: 100% !important;
+          }
         }
       `}</style>
     </div>
