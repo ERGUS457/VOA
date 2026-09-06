@@ -256,29 +256,57 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
     ]);
 
     // ==========================================
-    // 1. EXTRACT FULL NAME (VIZ & UNIVERSAL MRZ)
+    // 1. EXTRACT FULL NAME (UNIVERSAL MRZ & VIZ)
     // ==========================================
-    // Strategy A: Visual Inspection Zone (VIZ) Labels across all passports
-    const vizNamePatterns = [
-      /(?:NAMA LENGKAP\s*[\/\-]?\s*FULL NAME|FULL NAME|NAMA LENGKAP)[\s\/:.\-]+(?:\r?\n)?[\s]*([A-Z][A-Z\s\-]{2,35})/i,
-      /(?:SURNAME|GIVEN NAMES?)[\s\/:.\-]+(?:\r?\n)?[\s]*([A-Z][A-Z\s\-]{2,35})/i,
-      /(?:NAMA\s*[\/\-]?\s*NAME|NAME|NAMA)[\s\/:.\-]+(?:\r?\n)?[\s]*([A-Z][A-Z\s\-]{2,35})/i,
-    ];
+    // Strategy A: ICAO Universal MRZ Line 1 (P<XXXSURNAME<<GIVEN_NAMES<<<<)
+    for (const line of lines) {
+      // Must start with P (e.g. P<IDN, PASGP, P<MYS) and contain <<
+      if (/^P[<A-Z0-9]/.test(line) && line.includes('<<')) {
+        const clean = line.replace(/^P[<A-Z0-9]{0,4}/, '');
+        const parts = clean.split('<<');
+        if (parts.length >= 2) {
+          const p1 = parts[0].replace(/[^A-Z]/g, '').trim();
+          // In given name, split on < and take only valid vowel-containing words (ignoring filler noise)
+          const givenWords = parts[1].split('<').map(w => w.replace(/[^A-Z]/g, '').trim()).filter(w => isValidNameWord(w));
+          const p2 = givenWords.join(' ');
 
-    for (const pat of vizNamePatterns) {
-      if (fullName) break;
-      const m = rawText.match(pat);
-      if (m && m[1]) {
-        const candidate = m[1].split(/\r?\n/)[0].trim().toUpperCase();
-        const words = candidate.split(/\s+/).filter(w => isValidNameWord(w));
-        const hasForbidden = words.some(w => forbiddenNameWords.has(w));
-        if (!hasForbidden && words.length >= 1 && words.length <= 4) {
-          fullName = words.join(' ');
+          if (isValidNameWord(p1) && p2) {
+            fullName = `${p2} ${p1}`.trim();
+            break;
+          } else if (isValidNameWord(p1)) {
+            fullName = p1;
+            break;
+          } else if (p2) {
+            fullName = p2;
+            break;
+          }
         }
       }
     }
 
-    // Strategy B: Standalone clean visual name line in passport body
+    // Strategy B: Visual Inspection Zone (VIZ) Labels across all passports
+    if (!fullName) {
+      const vizNamePatterns = [
+        /(?:NAMA LENGKAP\s*[\/\-]?\s*FULL NAME|FULL NAME|NAMA LENGKAP)[\s\/:.\-]+(?:\r?\n)?[\s]*([A-Z][A-Z\s\-]{2,35})/i,
+        /(?:SURNAME|GIVEN NAMES?)[\s\/:.\-]+(?:\r?\n)?[\s]*([A-Z][A-Z\s\-]{2,35})/i,
+        /(?:NAMA\s*[\/\-]?\s*NAME|NAME|NAMA)[\s\/:.\-]+(?:\r?\n)?[\s]*([A-Z][A-Z\s\-]{2,35})/i,
+      ];
+
+      for (const pat of vizNamePatterns) {
+        if (fullName) break;
+        const m = rawText.match(pat);
+        if (m && m[1]) {
+          const candidate = m[1].split(/\r?\n/)[0].trim().toUpperCase();
+          const words = candidate.split(/\s+/).filter(w => isValidNameWord(w));
+          const hasForbidden = words.some(w => forbiddenNameWords.has(w));
+          if (!hasForbidden && words.length >= 1 && words.length <= 4) {
+            fullName = words.join(' ');
+          }
+        }
+      }
+    }
+
+    // Strategy C: Standalone clean visual name line in passport body
     if (!fullName) {
       for (const line of lines) {
         if (/^[A-Z\s\-]{4,35}$/.test(line)) {
@@ -287,34 +315,6 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
           if (!hasForbidden && words.length >= 2 && words.length <= 4) {
             fullName = words.join(' ');
             break;
-          }
-        }
-      }
-    }
-
-    // Strategy C: ICAO Universal MRZ Line 1 (P<XXXSURNAME<<GIVEN_NAMES<<<<)
-    if (!fullName) {
-      for (const line of lines) {
-        // Must start with P (e.g. P<IDN, PASGP, P<MYS) and contain <<
-        if (/^P[<A-Z0-9]/.test(line) && line.includes('<<')) {
-          const clean = line.replace(/^P[<A-Z0-9]{0,4}/, '');
-          const parts = clean.split('<<');
-          if (parts.length >= 2) {
-            const p1 = parts[0].replace(/[^A-Z]/g, '').trim();
-            // In given name, split on < and take only valid vowel-containing words (ignoring filler noise)
-            const givenWords = parts[1].split('<').map(w => w.replace(/[^A-Z]/g, '').trim()).filter(w => isValidNameWord(w));
-            const p2 = givenWords.join(' ');
-
-            if (isValidNameWord(p1) && p2) {
-              fullName = `${p2} ${p1}`.trim();
-              break;
-            } else if (isValidNameWord(p1)) {
-              fullName = p1;
-              break;
-            } else if (p2) {
-              fullName = p2;
-              break;
-            }
           }
         }
       }
