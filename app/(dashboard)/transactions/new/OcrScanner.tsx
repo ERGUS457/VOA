@@ -239,67 +239,82 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
     const textUpper = rawText.toUpperCase();
     const lines = textUpper.split('\n').map(l => l.trim()).filter(Boolean);
 
+    // Helper to validate real human name words (must contain vowels, no junk consonants)
+    const isValidNameWord = (w: string) => {
+      if (!w || w.length < 2 || w.length > 25) return false;
+      if (!/[AEIOUY]/i.test(w)) return false;
+      if (/[CKL<]{4,}/i.test(w)) return false;
+      return true;
+    };
+
+    const forbiddenNameWords = new Set([
+      'PASSPORT', 'PASPOR', 'REPUBLIK', 'REPUBLIC', 'INDONESIA', 'SINGAPORE', 'MALAYSIA',
+      'CITIZEN', 'IMIGRASI', 'KEMENTERIAN', 'MINISTRY', 'HUKUM', 'HAM', 'AUTHORITY', 'OFFICE',
+      'BUKITTINGGI', 'JAKARTA', 'DEPOK', 'SURABAYA', 'MEDAN', 'BANDUNG', 'SEMARANG',
+      'PERHATIAN', 'WARNING', 'ISSUING', 'NATIONALITY', 'WARGANEGARA', 'TANGGAL', 'DATE',
+      'BIRTH', 'LAHIR', 'EXPIRY', 'BERLAKU', 'SEX', 'JENIS', 'KELAMIN', 'TAPSCANNER', 'SCANNED'
+    ]);
+
     // ==========================================
     // 1. EXTRACT FULL NAME (VIZ & UNIVERSAL MRZ)
     // ==========================================
     // Strategy A: Visual Inspection Zone (VIZ) Labels across all passports
     const vizNamePatterns = [
-      /(?:NAMA LENGKAP|FULL NAME)[\s\/:.\-]+(?:\r?\n)?[\s]*([A-Z][A-Z\s\-]{2,35})/i,
+      /(?:NAMA LENGKAP\s*[\/\-]?\s*FULL NAME|FULL NAME|NAMA LENGKAP)[\s\/:.\-]+(?:\r?\n)?[\s]*([A-Z][A-Z\s\-]{2,35})/i,
       /(?:SURNAME|GIVEN NAMES?)[\s\/:.\-]+(?:\r?\n)?[\s]*([A-Z][A-Z\s\-]{2,35})/i,
-      /(?:NAMA|NAME)[\s\/:.\-]+(?:\r?\n)?[\s]*([A-Z][A-Z\s\-]{2,35})/i,
+      /(?:NAMA\s*[\/\-]?\s*NAME|NAME|NAMA)[\s\/:.\-]+(?:\r?\n)?[\s]*([A-Z][A-Z\s\-]{2,35})/i,
     ];
 
     for (const pat of vizNamePatterns) {
       if (fullName) break;
       const m = rawText.match(pat);
       if (m && m[1]) {
-        // Take first line only if multiple lines matched
         const candidate = m[1].split(/\r?\n/)[0].trim().toUpperCase();
-        if (
-          !candidate.includes('PASSPORT') &&
-          !candidate.includes('PASPOR') &&
-          !candidate.includes('REPUBLIK') &&
-          !candidate.includes('REPUBLIC') &&
-          !candidate.includes('INDONESIA') &&
-          !candidate.includes('SINGAPORE') &&
-          !candidate.includes('MALAYSIA') &&
-          !candidate.includes('CITIZEN') &&
-          !candidate.includes('IMIGRASI') &&
-          !candidate.includes('KEMENTERIAN') &&
-          !candidate.includes('MINISTRY') &&
-          candidate.length >= 3
-        ) {
-          fullName = candidate;
+        const words = candidate.split(/\s+/).filter(w => isValidNameWord(w));
+        const hasForbidden = words.some(w => forbiddenNameWords.has(w));
+        if (!hasForbidden && words.length >= 1 && words.length <= 4) {
+          fullName = words.join(' ');
         }
       }
     }
 
-    // Strategy B: ICAO Universal MRZ Line 1 (Primary<<Secondary identifier)
+    // Strategy B: Standalone clean visual name line in passport body
     if (!fullName) {
       for (const line of lines) {
-        const norm = line.replace(/[\s\(\[\{]/g, '<').replace(/<+/g, '<');
-        // Look for SURNAME<<GIVEN_NAMES
-        if (line.includes('<<')) {
-          const mrzMatch = line.match(/([A-Z]{2,})<{2,}([A-Z<]{2,})/);
-          if (mrzMatch) {
-            let part1 = mrzMatch[1].trim();
-            let part2 = mrzMatch[2].replace(/<+/g, ' ').trim();
+        if (/^[A-Z\s\-]{4,35}$/.test(line)) {
+          const words = line.split(/\s+/).filter(w => isValidNameWord(w));
+          const hasForbidden = words.some(w => forbiddenNameWords.has(w));
+          if (!hasForbidden && words.length >= 2 && words.length <= 4) {
+            fullName = words.join(' ');
+            break;
+          }
+        }
+      }
+    }
 
-            // Strip 3-letter ICAO country code prefix if stuck to part1 (e.g. IDNSUSANTI, SGPAHMAD)
-            const commonCodes = ['IDN', 'MYS', 'SGP', 'BRN', 'THA', 'PHL', 'USA', 'GBR', 'AUS', 'CHN', 'JPN', 'KOR', 'VNM'];
-            for (const cc of commonCodes) {
-              if (part1.startsWith(cc) && part1.length > 5) {
-                part1 = part1.substring(cc.length);
-                break;
-              }
-            }
+    // Strategy C: ICAO Universal MRZ Line 1 (P<XXXSURNAME<<GIVEN_NAMES<<<<)
+    if (!fullName) {
+      for (const line of lines) {
+        // Must start with P (e.g. P<IDN, PASGP, P<MYS) and contain <<
+        if (/^P[<A-Z0-9]/.test(line) && line.includes('<<')) {
+          const clean = line.replace(/^P[<A-Z0-9]{0,4}/, '');
+          const parts = clean.split('<<');
+          if (parts.length >= 2) {
+            const p1 = parts[0].replace(/[^A-Z]/g, '').trim();
+            // In given name, split on < and take only valid vowel-containing words (ignoring filler noise)
+            const givenWords = parts[1].split('<').map(w => w.replace(/[^A-Z]/g, '').trim()).filter(w => isValidNameWord(w));
+            const p2 = givenWords.join(' ');
 
-            if (part1 && part2) {
-              fullName = `${part2} ${part1}`.trim();
-            } else if (part1) {
-              fullName = part1;
+            if (isValidNameWord(p1) && p2) {
+              fullName = `${p2} ${p1}`.trim();
+              break;
+            } else if (isValidNameWord(p1)) {
+              fullName = p1;
+              break;
+            } else if (p2) {
+              fullName = p2;
+              break;
             }
-            if (fullName) break;
           }
         }
       }
