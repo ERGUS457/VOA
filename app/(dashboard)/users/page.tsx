@@ -59,7 +59,7 @@ export default async function UsersPage() {
                 </td>
                 <td className="px-4 py-3 text-sm">{new Date(user.createdAt).toLocaleDateString('id-ID')}</td>
                 <td className="px-4 py-3">
-                  <UserActions user={user} />
+                  <UserActions user={user} currentUserId={session.userId} />
                 </td>
               </tr>
             ))}

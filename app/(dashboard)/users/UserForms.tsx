@@ -88,11 +88,13 @@ export function AddUserModal() {
   );
 }
 
-export function UserActions({ user }: { user: any }) {
+export function UserActions({ user, currentUserId }: { user: any, currentUserId: string }) {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const isSelf = user.id === currentUserId;
 
   const handleEdit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -121,6 +123,10 @@ export function UserActions({ user }: { user: any }) {
     }
     setLoading(false);
   };
+
+  if (isSelf) {
+    return <span className="text-xs text-slate-400 font-medium italic">Akun Anda</span>;
+  }
 
   return (
     <>

@@ -4,6 +4,7 @@ import { checkVoaNumber, createTransactionAction } from './actions';
 import WebcamCapture from './WebcamCapture';
 import { Loader2, AlertCircle, CheckCircle2, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import OcrScanner from './OcrScanner';
 
 export default function CreateTransactionPage() {
   const router = useRouter();
@@ -18,6 +19,16 @@ export default function CreateTransactionPage() {
   const serviceFee = 13500;
   const totalAmount = voaPrice + serviceFee;
   const formatRp = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
+
+  const handleOcrScan = (data: any) => {
+    const form = document.querySelector('form');
+    if (form) {
+      if (data.fullName) (form.elements.namedItem('fullName') as HTMLInputElement).value = data.fullName;
+      if (data.passportNumber) (form.elements.namedItem('passportNumber') as HTMLInputElement).value = data.passportNumber;
+      if (data.nationality) (form.elements.namedItem('nationality') as HTMLInputElement).value = data.nationality;
+      if (data.gender) (form.elements.namedItem('gender') as HTMLSelectElement).value = data.gender;
+    }
+  };
 
   useEffect(() => {
     if (!voaNumber) {
@@ -85,7 +96,10 @@ export default function CreateTransactionPage() {
             </div>
           </div>
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800 border-b pb-2">2. Data Pemohon</h2>
+            <div className="flex justify-between items-center border-b pb-2">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800">2. Data Pemohon</h2>
+              <OcrScanner onScan={handleOcrScan} />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Nomor Paspor *</label>
