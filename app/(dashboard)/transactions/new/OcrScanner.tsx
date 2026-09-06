@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createWorker, Worker } from 'tesseract.js';
 import { Scan, X, Loader2, Upload, Camera, RotateCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { processPassportImageWithGemini } from '@/app/actions/ocrAction';
 
 export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -190,13 +191,26 @@ export default function OcrScanner({ onScan }: { onScan: (data: any) => void }) 
     setError('');
 
     try {
+      // 1. Try Gemini AI first for high accuracy
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      const res = await processPassportImageWithGemini(dataUrl);
+      
+      if (res.success && res.data && (res.data.passportNumber || res.data.fullName)) {
+        setDetectedData(res.data);
+        setIsProcessing(false);
+        return;
+      }
+      
+      console.log('Gemini failed or returned empty data, falling back to Tesseract OCR...', res.error);
+
+      // 2. Fallback to Tesseract if Gemini fails
       if (!workerRef.current) {
         const worker = await createWorker('eng');
         workerRef.current = worker;
       }
 
-      const res = await workerRef.current.recognize(canvas);
-      const text = res.data.text;
+      const tesseractRes = await workerRef.current.recognize(canvas);
+      const text = tesseractRes.data.text;
       console.log('Tesseract OCR Output:', text);
 
       const parsed = parsePassportText(text);
