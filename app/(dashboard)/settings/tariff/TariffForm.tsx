@@ -3,12 +3,12 @@
 import { useState } from 'react';
 import { updateTariffAction } from './actions';
 import { Save, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 export default function TariffForm({ initialVoaPrice, initialServiceFee }: { initialVoaPrice: string, initialServiceFee: string }) {
   const [voaPrice, setVoaPrice] = useState(initialVoaPrice);
   const [serviceFee, setServiceFee] = useState(initialServiceFee);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   const total = Number(voaPrice || 0) + Number(serviceFee || 0);
 
@@ -17,7 +17,6 @@ export default function TariffForm({ initialVoaPrice, initialServiceFee }: { ini
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setMessage(null);
 
     const formData = new FormData();
     formData.append('voaPrice', voaPrice);
@@ -25,20 +24,24 @@ export default function TariffForm({ initialVoaPrice, initialServiceFee }: { ini
 
     const res = await updateTariffAction(formData);
     
-    if (res.error) setMessage({ type: 'error', text: res.error });
-    if (res.success) setMessage({ type: 'success', text: res.success });
+    if (res.error) {
+      Swal.fire('Gagal!', res.error, 'error');
+    }
+    if (res.success) {
+      Swal.fire({
+        title: 'Tersimpan!',
+        text: res.success,
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false
+      });
+    }
     
     setLoading(false);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {message && (
-        <div className={`p-4 rounded-xl flex items-center gap-3 text-sm font-medium ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-          {message.type === 'success' ? <CheckCircle2 className="w-5 h-5 shrink-0" /> : <AlertCircle className="w-5 h-5 shrink-0" />}
-          {message.text}
-        </div>
-      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>

@@ -5,6 +5,7 @@ import WebcamCapture from './WebcamCapture';
 import { Loader2, AlertCircle, CheckCircle2, ChevronRight, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import OcrScanner from './OcrScanner';
+import Swal from 'sweetalert2';
 
 export default function CreateTransactionPage() {
   const router = useRouter();
@@ -57,19 +58,61 @@ export default function CreateTransactionPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (voaStatus?.status !== 'AVAILABLE') {
-      alert('Pilih Nomor VOA yang tersedia!');
+      Swal.fire({
+        title: 'Perhatian!',
+        text: 'Pilih Nomor VOA yang tersedia terlebih dahulu!',
+        icon: 'warning',
+        confirmButtonText: 'Tutup'
+      });
       return;
     }
     setSaving(true);
     setErrorMsg('');
+
+    const confirm = await Swal.fire({
+      title: 'Konfirmasi Transaksi',
+      html: `
+        <div class="text-left text-sm space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-200 mt-2">
+          <p><strong>Nomor VOA:</strong> <span class="font-mono text-navy font-bold">${voaNumber}</span></p>
+          <p><strong>Nama:</strong> ${fullName}</p>
+          <p><strong>Nomor Paspor:</strong> ${passportNumber}</p>
+          <p class="text-emerald-700 font-bold pt-1 border-t border-slate-200 mt-2"><strong>Total Bayar:</strong> ${formatRp(totalAmount)}</p>
+        </div>
+      `,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#1E3A8A',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Ya, Proses Transaksi!',
+      cancelButtonText: 'Batal'
+    });
+
+    if (!confirm.isConfirmed) {
+      setSaving(false);
+      return;
+    }
+
     const formData = new FormData(e.currentTarget);
     formData.append('photoData', photoData);
     const res = await createTransactionAction(formData);
     
     if (res.error) {
       setErrorMsg(res.error);
+      Swal.fire({
+        title: 'Transaksi Gagal!',
+        text: res.error,
+        icon: 'error',
+        confirmButtonColor: '#1E3A8A'
+      });
       setSaving(false);
     } else if (res.success && res.id) {
+      await Swal.fire({
+        title: 'Transaksi Berhasil!',
+        text: 'Data telah disimpan. Menuju lembar struk...',
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false
+      });
       router.push(`/receipt/${res.id}`);
     }
   };

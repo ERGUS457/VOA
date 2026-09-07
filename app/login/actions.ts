@@ -38,6 +38,5 @@ export async function loginAction(prevState: any, formData: FormData) {
     return { error: 'Terjadi kesalahan sistem.' };
   }
 
-  // Redirect should be outside try-catch
-  redirect('/dashboard');
+  return { success: true };
 }

@@ -1,6 +1,7 @@
 'use client';
 import { useRef, useState, useCallback } from 'react';
 import { Camera, Image as ImageIcon, RotateCcw, Check } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 export default function WebcamCapture({ onCapture }: { onCapture: (base64: string) => void }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -12,7 +13,12 @@ export default function WebcamCapture({ onCapture }: { onCapture: (base64: strin
       const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
       setStream(mediaStream);
     } catch (err) {
-      alert('Kamera tidak dapat diakses.');
+      Swal.fire({
+        title: 'Error!',
+        text: 'Kamera tidak dapat diakses atau diblokir oleh browser.',
+        icon: 'error',
+        confirmButtonText: 'Tutup'
+      });
     }
   };
 

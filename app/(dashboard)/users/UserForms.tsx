@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { createUserAction, updateUserAction, deleteUserAction } from './actions';
 import { Edit2, Trash2, Plus, X } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 export function AddUserModal() {
   const [isOpen, setIsOpen] = useState(false);
@@ -21,6 +22,13 @@ export function AddUserModal() {
       setError(res.error);
     } else {
       setIsOpen(false);
+      Swal.fire({
+        title: 'Berhasil!',
+        text: 'Petugas baru berhasil ditambahkan.',
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false
+      });
     }
     setLoading(false);
   };
@@ -90,7 +98,6 @@ export function AddUserModal() {
 
 export function UserActions({ user, currentUserId }: { user: any, currentUserId: string }) {
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -108,18 +115,43 @@ export function UserActions({ user, currentUserId }: { user: any, currentUserId:
       setError(res.error);
     } else {
       setIsEditOpen(false);
+      Swal.fire({
+        title: 'Berhasil!',
+        text: 'Data petugas berhasil diperbarui.',
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false
+      });
     }
     setLoading(false);
   };
 
   const handleDelete = async () => {
+    const confirmResult = await Swal.fire({
+      title: 'Hapus Petugas?',
+      text: `Anda yakin ingin menghapus ${user.name}? Tindakan ini tidak dapat dibatalkan.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Ya, Hapus!',
+      cancelButtonText: 'Batal'
+    });
+
+    if (!confirmResult.isConfirmed) return;
+
     setLoading(true);
-    setError('');
     const res = await deleteUserAction(user.id);
     if (res.error) {
-      setError(res.error);
+      Swal.fire('Gagal!', res.error, 'error');
     } else {
-      setIsDeleteOpen(false);
+      Swal.fire({
+        title: 'Terhapus!',
+        text: 'Petugas berhasil dihapus.',
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false
+      });
     }
     setLoading(false);
   };
@@ -134,7 +166,7 @@ export function UserActions({ user, currentUserId }: { user: any, currentUserId:
         <button onClick={() => setIsEditOpen(true)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Edit Petugas">
           <Edit2 className="w-4 h-4" />
         </button>
-        <button onClick={() => setIsDeleteOpen(true)} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Hapus Petugas">
+        <button onClick={handleDelete} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Hapus Petugas">
           <Trash2 className="w-4 h-4" />
         </button>
       </div>
@@ -190,26 +222,6 @@ export function UserActions({ user, currentUserId }: { user: any, currentUserId:
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {isDeleteOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
-            <Trash2 className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h2 className="font-bold text-lg text-slate-800 mb-2">Hapus Petugas?</h2>
-            <p className="text-sm text-slate-500 mb-6">Anda yakin ingin menghapus <strong>{user.name}</strong>? Tindakan ini tidak dapat dibatalkan.</p>
-            
-            {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-xs font-semibold mb-4 text-left">{error}</div>}
-
-            <div className="flex justify-center gap-3">
-              <button onClick={() => setIsDeleteOpen(false)} className="px-4 py-2 font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-lg">Batal</button>
-              <button onClick={handleDelete} disabled={loading} className="px-4 py-2 font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50">
-                {loading ? 'Menghapus...' : 'Ya, Hapus'}
-              </button>
-            </div>
           </div>
         </div>
       )}

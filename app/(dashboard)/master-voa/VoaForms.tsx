@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createVoaAction, updateVoaAction, cancelVoaAction, checkVoaDuplicate } from './actions';
 import { PlusCircle, X, Loader2, CheckCircle2, AlertCircle, Edit, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import Swal from 'sweetalert2';
 
 export function VoaActions({ voa }: { voa: any }) {
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -36,15 +37,49 @@ export function VoaActions({ voa }: { voa: any }) {
     setLoading(false);
     if (res.success) {
       setIsEditOpen(false);
+      Swal.fire({
+        title: 'Berhasil!',
+        text: 'Nomor VOA berhasil diubah.',
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false
+      });
     } else {
-      alert(res.error);
+      Swal.fire({
+        title: 'Gagal!',
+        text: res.error,
+        icon: 'error',
+        confirmButtonText: 'Tutup'
+      });
     }
   };
 
   const handleCancel = async () => {
-    if (!confirm('Yakin ingin membatalkan VOA ini?')) return;
+    const confirmResult = await Swal.fire({
+      title: 'Yakin membatalkan?',
+      text: 'Status VOA ini akan menjadi CANCELLED.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Ya, Batalkan!',
+      cancelButtonText: 'Kembali'
+    });
+    
+    if (!confirmResult.isConfirmed) return;
+    
     const res = await cancelVoaAction(voa.id);
-    if (res.error) alert(res.error);
+    if (res.error) {
+      Swal.fire('Gagal!', res.error, 'error');
+    } else {
+      Swal.fire({
+        title: 'Dibatalkan!',
+        text: 'VOA berhasil dibatalkan.',
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false
+      });
+    }
   };
 
   if (voa.status === 'USED') {
@@ -130,10 +165,24 @@ export function AddVoaModal() {
     const res = await createVoaAction(voaNumber);
     setLoading(false);
     
-    if (res.error) alert(res.error);
+    if (res.error) {
+      Swal.fire({
+        title: 'Gagal!',
+        text: res.error,
+        icon: 'error',
+        confirmButtonText: 'Tutup'
+      });
+    }
     if (res.success) {
       setIsOpen(false);
       setVoaNumber('');
+      Swal.fire({
+        title: 'Berhasil!',
+        text: 'VOA berhasil ditambahkan.',
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false
+      });
     }
   };
 

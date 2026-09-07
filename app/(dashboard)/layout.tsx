@@ -1,7 +1,7 @@
 import SidebarMenu from './SidebarMenu';
 import LiveClock from './LiveClock';
-import { LogOut } from 'lucide-react';
-import { verifySession, deleteSession } from '@/lib/auth';
+import LogoutButton from './LogoutButton';
+import { verifySession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -28,16 +28,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
 
         <div className="p-4 border-t border-white/10 bg-slate-900/50">
-          <form action={async () => {
-            'use server';
-            await deleteSession();
-            redirect('/login');
-          }}>
-            <button className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors">
-              <LogOut className="w-5 h-5 shrink-0" />
-              <span className="text-sm font-bold">Logout</span>
-            </button>
-          </form>
+          <LogoutButton />
         </div>
       </aside>
 

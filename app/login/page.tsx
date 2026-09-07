@@ -4,6 +4,9 @@ import { useFormState, useFormStatus } from 'react-dom';
 import { loginAction } from './actions';
 import { Shield, User, Lock, AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import Swal from 'sweetalert2';
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -21,6 +24,21 @@ function SubmitButton() {
 
 export default function LoginPage() {
   const [state, formAction] = useFormState(loginAction, null);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (state?.success) {
+      Swal.fire({
+        title: 'Berhasil Login!',
+        text: 'Selamat datang di Sistem VOA PLBN Aruk.',
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false
+      }).then(() => {
+        router.push('/dashboard');
+      });
+    }
+  }, [state, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900 bg-gradient-to-br from-slate-900 via-navy-dark to-slate-900 relative overflow-hidden">
